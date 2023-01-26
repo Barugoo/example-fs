@@ -22,6 +22,7 @@ type MemStorage struct {
 }
 
 func (ms *MemStorage) Get(key string) (value string, err error) {
+	log.Println("called mem storage Get method")
 	var ok bool
 
 	value, ok = ms.m[key]
@@ -32,6 +33,7 @@ func (ms *MemStorage) Get(key string) (value string, err error) {
 }
 
 func (ms *MemStorage) Set(key, value string) (err error) {
+	log.Println("called mem storage Set method")
 	ms.m[key] = value
 	return nil
 }
@@ -41,16 +43,15 @@ func NewMemStorage() Storage { // обрати внимание, что возв
 
 // file
 type FileStorage struct {
-	ms *MemStorage // сделаем внутреннюю хранилку в памяти тоже интерфейсом, на случай если захотим ее замокать
-	f  *os.File
+	*MemStorage // встроем реализацию хранилки в памяти
+	f           *os.File
 }
 
-func (fs *FileStorage) Get(key string) (value string, err error) {
-	return fs.ms.Get(key)
-}
-
+// и переопределим только метод сет - чтение будет идти из мапки
 func (fs *FileStorage) Set(key, value string) (err error) {
-	if err = fs.ms.Set(key, value); err != nil {
+	log.Println("called file storage Set method")
+
+	if err = fs.MemStorage.Set(key, value); err != nil {
 		return fmt.Errorf("unable to add new key in memorystorage: %w", err)
 	}
 
@@ -64,7 +65,7 @@ func (fs *FileStorage) Set(key, value string) (err error) {
 		return fmt.Errorf("unable to get the beginning of file: %w", err)
 	}
 
-	err = json.NewEncoder(fs.f).Encode(&fs.ms.m)
+	err = json.NewEncoder(fs.f).Encode(&fs.m)
 	if err != nil {
 		return fmt.Errorf("unable to encode data into the file: %w", err)
 	}
@@ -85,8 +86,8 @@ func NewFileStorage(filename string) (Storage, error) { // и здесь мы т
 	}
 
 	return &FileStorage{
-		ms: &MemStorage{m: m},
-		f:  file,
+		MemStorage: &MemStorage{m: m},
+		f:          file,
 	}, nil
 }
 
@@ -136,4 +137,3 @@ func main() {
 
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
-
